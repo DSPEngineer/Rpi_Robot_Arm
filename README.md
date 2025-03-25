@@ -12,7 +12,7 @@ This project is based on the Raspbery Pi 4 and is inteded to control a 6 DOF Rob
   - Power Supply
   - SD Card with OS
 - RAB Holder developmnet with breadboard
-- 40 pin GPIO Extender
+- 40 Pi Wedge (pin and GPIO Extender)
 - Wii Nunchuck Controllerwii Nunchuck Controller
   - Olimex PMIC Adapter Board (8 pins)
 
