@@ -3,7 +3,7 @@ i2ctest.cpp
 Raspberry Pi I2C interface to Wii-Nunchuk Controller
 Jose Pagan
 05/06/201425
-Github:  
+Github:  https://github.com/DSPEngineer/Rpi_Robot_Arm
 
 A brief demonstration of the Raspberry Pi I2C interface, using the SparkFun
 Pi Wedge breakout board.
@@ -66,6 +66,26 @@ Distributed as-is; no warranty is given.
 using namespace std;
 
 #define WII_NUNCHUK        0x52
+
+
+   #define BUTTON_Z     0x01
+   #define BUTTON_C     0x02
+
+   typedef struct __Accelerometer
+   { // Struct to save Accelerometer Data
+      uint16_t Acc_X;
+      uint16_t Acc_Y;
+      uint16_t Acc_Z;
+   } ACCELEROMETER, *pACCELEROMETER;
+
+   typedef struct __Joystick
+   { // Struct to save Accelerometer Data
+      uint16_t Joy_X;
+      uint16_t Joy_Y;
+      bool     Btn_C;
+      bool     Btn_Z;
+   } JOYSTICK, *pJOYSTICK;
+
 
 
 int main()
@@ -140,24 +160,6 @@ int main()
    chr = wiringPiI2CReadReg8(fd, 0x05 );
    cout << " | " << hex << static_cast<int>(chr) << endl;
 
-
-   #define BUTTON_Z     0x01
-   #define BUTTON_C     0x02
-
-   typedef struct __Accelerometer
-   { // Struct to save Accelerometer Data
-      uint16_t Acc_X;
-      uint16_t Acc_Y;
-      uint16_t Acc_Z;
-   } ACCELEROMETER, *pACCELEROMETER;
-
-   typedef struct __Joystick
-   { // Struct to save Accelerometer Data
-      uint16_t Joy_X;
-      uint16_t Joy_Y;
-      bool     Btn_C;
-      bool     Btn_Z;
-   } JOYSTICK, *pJOYSTICK;
 
    while( true )
    {
