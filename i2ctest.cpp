@@ -62,30 +62,38 @@ Distributed as-is; no warranty is given.
 #include <iostream>
 #include <errno.h>
 #include <wiringPiI2C.h>
+#include <unistd.h>
+
 
 using namespace std;
 
 #define WII_NUNCHUK        0x52
 
+#define MILISECONDS        1000
 
-   #define BUTTON_Z     0x01
-   #define BUTTON_C     0x02
+#define BUTTON_Z     0x01
+#define BUTTON_C     0x02
 
-   typedef struct __Accelerometer
-   { // Struct to save Accelerometer Data
-      uint16_t Acc_X;
-      uint16_t Acc_Y;
-      uint16_t Acc_Z;
-   } ACCELEROMETER, *pACCELEROMETER;
+typedef struct __Accelerometer
+{ // Struct to save Accelerometer Data
+    uint16_t X;
+    uint16_t Y;
+    uint16_t Z;
+} ACCELEROMETER, *pACCELEROMETER;
 
-   typedef struct __Joystick
-   { // Struct to save Accelerometer Data
-      uint16_t Joy_X;
-      uint16_t Joy_Y;
-      bool     Btn_C;
-      bool     Btn_Z;
-   } JOYSTICK, *pJOYSTICK;
+typedef struct __Joystick
+{ // Struct to save Accelerometer Data
+    uint16_t X;
+    uint16_t Y;
+ } JOYSTICK, *pJOYSTICK;
 
+typedef struct __Nunchuk
+{
+    ACCELEROMETER  accel;
+    JOYSTICK       jstik;
+    bool           btn_c;
+    bool           btn_z;
+} NUNCHUK, *pNUNCHUK;
 
 
 int main()
@@ -107,6 +115,7 @@ int main()
    std::cout << "I2C communication successfully setup.\n";
 
    // disable encryption
+
 //   result = wiringPiI2CWriteReg16(fd, 0x40, 0x0000 );
    result = wiringPiI2CWriteReg8(fd, 0xF0, 0x55 );
    result = wiringPiI2CWriteReg8(fd, 0xFB, 0x00 );
@@ -160,19 +169,65 @@ int main()
    chr = wiringPiI2CReadReg8(fd, 0x05 );
    cout << " | " << hex << static_cast<int>(chr) << endl;
 
+   #define  isButtonC( r )  ( ! ( (r) & BUTTON_C ) )
+   #define  isButtonZ( r )  ( ! ( (r) & BUTTON_Z ) )
+
+   NUNCHUK ctrl = { 0 };
 
    while( true )
    {
-
       // First read the last byte to check for exit condition Button-C
       chr = wiringPiI2CReadReg8(fd, 0x05 );
-      cout << "REG 6: " << hex << chr << endl;
-      if( chr | ~BUTTON_C )
+
+      if( isButtonC( chr ) && !ctrl.btn_c )
       {
-         break;
+         ctrl.btn_c = true;
+         cout << "Button C pressed" << endl;
+      }
+      else if( !isButtonC( chr ) && ctrl.btn_c )
+      {
+         ctrl.btn_c = false;
+         cout << "Button C released" << endl;
       }
 
+      if( isButtonZ( chr ) && !ctrl.btn_z )
+      {
+         ctrl.btn_z = true;
+         cout << "Button Z pressed" << endl;
+      }
+      else if( !isButtonZ( chr ) && ctrl.btn_z )
+      {
+         ctrl.btn_z = false;
+         cout << "Button Z released" << endl;
+      }
+
+      if( isButtonC( chr ) && isButtonZ( chr ) )
+      {
+         cout << "Button C and Z pressed, exit signal." << endl;
+         break;
+      }
 //      result = wiringPiI2CWriteReg16(fd, 0x40, (i & 0xfff) );
+
+      // Need to set high order byte for Accelerometer
+      ctrl.accel.Z = ( chr & 0xC0 ) << 8;
+      ctrl.accel.Y = ( chr & 0x30 ) << 10;
+      ctrl.accel.X = ( chr & 0x0C ) << 12;
+
+      // Need to set high order byte for Accelerometer
+      ctrl.accel.X += wiringPiI2CReadReg8(fd, 0x02 );
+      ctrl.accel.Y += wiringPiI2CReadReg8(fd, 0x03 );
+      ctrl.accel.Z += wiringPiI2CReadReg8(fd, 0x04 );
+
+      // Read Joystick X
+      ctrl.jstik.X = wiringPiI2CReadReg8(fd, 0x00 );
+      ctrl.jstik.Y = wiringPiI2CReadReg8(fd, 0x01 );
+
+      cout << "REG ==> JX: " << showbase << hex << (int)ctrl.jstik.X;
+      cout << " | JY: " << hex << (int)ctrl.jstik.Y;
+      cout << " :: AX: " << hex << (int)ctrl.accel.X;
+      cout << " :: AY: " << hex << (int)ctrl.accel.Y;
+      cout << " :: AZ: " << hex << (int)ctrl.accel.Z << endl;
+      usleep( MILISECONDS * 100 );
 
       if(result == -1)
       {
