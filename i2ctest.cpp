@@ -63,11 +63,17 @@ Distributed as-is; no warranty is given.
 #include <errno.h>
 #include <wiringPiI2C.h>
 #include <unistd.h>
+#include <iomanip>
 
+#include "pca9685.h"
+#include "pca9685.cpp"
 
 using namespace std;
 
-#define WII_NUNCHUK        0x52
+#define WII_NUNCHUK_I2C    0x52
+#define PCA9685_I2C        0x40
+
+#define PWM_FREQUENCY      60
 
 #define MILISECONDS        1000
 
@@ -89,6 +95,7 @@ typedef struct __Joystick
 
 typedef struct __Nunchuk
 {
+    uint32_t       id;
     ACCELEROMETER  accel;
     JOYSTICK       jstik;
     bool           btn_c;
@@ -96,88 +103,129 @@ typedef struct __Nunchuk
 } NUNCHUK, *pNUNCHUK;
 
 
+#define  isButtonC( r )  ( ! ( (r) & BUTTON_C ) )
+#define  isButtonZ( r )  ( ! ( (r) & BUTTON_Z ) )
+
+
+
 int main()
 {
-   int result;
+   int result = 0;
+
+   NUNCHUK ctrl = { 0 };
+
+//   wiringPiSetup();
 
    // Initialize the interface by giving it an external device ID.
    // The Wii Nunchuk Joustick defaults to address 0x52.   
    //
    // It returns a standard file descriptor.
    // 
-   cout << " INFO: Open I2C " << WII_NUNCHUK << " address." << endl;
-   int fd = wiringPiI2CSetup( WII_NUNCHUK );
-   if ( -1 == fd )
+   cout << " INFO: Open I2C 0x" << hex << WII_NUNCHUK_I2C << " address." << endl;
+   int fd_ctrl = wiringPiI2CSetup( WII_NUNCHUK_I2C );
+   if ( -1 == fd_ctrl )
    {
       std::cout << "Failed to init I2C communication to Wii NunChuk Joystick.\n";
       return -1;
    }
-   std::cout << "I2C communication successfully setup.\n";
+
+    cout << " INFO: Open I2C 0x" << hex << PCA9685_I2C << " address." << endl;
+    // Using class
+    PCA9685 pwm(0x40); // PCA9685 I2C address is 0x40
+
+    // Example: Set channel 0 to 90 degrees (assuming 1ms-2ms pulse range for 0-180 degrees)
+    // 1.5ms pulse is centered, which is (1.5/20) * 4096 = 307
+    pwm.set_pwm(0, 0, (uint16_t)307); 
+    sleep(1);
+
+     // Example: Set channel 0 to 180 degrees
+    // 2ms pulse is (2/20) * 4096 = 409
+    pwm.set_pwm(0, 0, (uint16_t)670);
+    sleep(1);
+
+    // Example: Set channel 0 to 0 degrees
+    // 1ms pulse is (1/20) * 4096 = 204
+   pwm.set_pwm(0, 0, (uint16_t)204);
+    sleep(1);
+
+   if( false  )
+   {
+      for( int i = 135; i < 730; i+=20 )
+      {
+         cout << "i = [" << dec << i << "]" << endl;
+         pwm.set_pwm(0, 0, i);
+         sleep(1);
+      }
+   }
 
    // disable encryption
+//   result = wiringPiI2CWriteReg16(fd_ctrl, 0x40, 0x0000 );
+   result = wiringPiI2CWriteReg8(fd_ctrl, 0xF0, 0x55 );
+   result = wiringPiI2CWriteReg8(fd_ctrl, 0xFB, 0x00 );
 
-//   result = wiringPiI2CWriteReg16(fd, 0x40, 0x0000 );
-   result = wiringPiI2CWriteReg8(fd, 0xF0, 0x55 );
-   result = wiringPiI2CWriteReg8(fd, 0xFB, 0x00 );
 
    // Read Device ID as 16 bit words:
-   int cword = wiringPiI2CReadReg16( fd, 0xFA );
+   int cword = wiringPiI2CReadReg16( fd_ctrl, 0xFA );
    cout << "REG: " << hex << ( cword ) << endl;
-   cword = wiringPiI2CReadReg16( fd, 0xFC );
+   cword = wiringPiI2CReadReg16( fd_ctrl, 0xFC );
    cout << "REG: " << hex << ( cword ) << endl;
-   cword = wiringPiI2CReadReg16( fd, 0xFE );
+   cword = wiringPiI2CReadReg16( fd_ctrl, 0xFE );
    cout << "REG: " << hex << ( cword ) << endl;
 
    // Read Device ID as 8 bit bytes:
-   uint8_t chr = wiringPiI2CReadReg8(fd, 0xFA );
+   uint8_t chr = wiringPiI2CReadReg8(fd_ctrl, 0xFA );
    cout << "REG: " << hex << static_cast<int>( chr );
-   chr = wiringPiI2CReadReg8(fd, 0xFB );
+
+   chr = wiringPiI2CReadReg8(fd_ctrl, 0xFB );
    cout << " | " << hex << static_cast<int>(chr);
 
-   chr = wiringPiI2CReadReg8(fd, 0xFC );
-   cout << " | " << hex << static_cast<int>(chr);
-   chr = wiringPiI2CReadReg8(fd, 0xFD );
-   cout << " | " << hex << static_cast<int>(chr);
+   chr = wiringPiI2CReadReg8(fd_ctrl, 0xFC );
+   ctrl.id |= (uint32_t)chr << 24;
+   cout << " | " << hex << static_cast<int>(chr) << "(" << ctrl.id << ")" ;
 
-   chr = wiringPiI2CReadReg8(fd, 0xFE );
-   cout << " | " << hex << static_cast<int>(chr);
-   chr = wiringPiI2CReadReg8(fd, 0xFF );
-   cout << " | " << hex << static_cast<int>(chr) << endl;
+   chr = wiringPiI2CReadReg8(fd_ctrl, 0xFD );
+   ctrl.id |= (uint32_t)chr << 16;
+   cout << " | " << hex << static_cast<int>(chr) << "(" << ctrl.id << ")" ;
 
+   chr = wiringPiI2CReadReg8(fd_ctrl, 0xFE );
+   ctrl.id |= (uint32_t)chr << 8;
+   cout << " | " << hex << static_cast<int>(chr) << "(" << ctrl.id << ")" ;
+
+   chr = wiringPiI2CReadReg8(fd_ctrl, 0xFF );
+   ctrl.id |= (uint32_t)chr << 0;
+   cout << " | " << hex << static_cast<int>(chr)   << "(" << ctrl.id << ")" << endl;
+
+   cout << "Device ID: " << showbase << hex << (ctrl.id) << endl << endl;
 
    // Read Device Data as 16 bit words:
-   cword = wiringPiI2CReadReg16( fd, 0x00 );
+   cword = wiringPiI2CReadReg16( fd_ctrl, 0x00 );
    cout << "DAT0: " << hex << ( cword ) << endl;
-   cword = wiringPiI2CReadReg16( fd, 0x02 );
+   cword = wiringPiI2CReadReg16( fd_ctrl, 0x02 );
    cout << "DAT2: " << hex << ( cword ) << endl;
-   cword = wiringPiI2CReadReg16( fd, 0x04 );
+   cword = wiringPiI2CReadReg16( fd_ctrl, 0x04 );
    cout << "DAT4: " << hex << ( cword ) << endl;
 
    // Read Device Data as 8 bit bytes:
-   chr = wiringPiI2CReadReg8(fd, 0x00 );
+   chr = wiringPiI2CReadReg8(fd_ctrl, 0x00 );
    cout << "DAT: " << hex << static_cast<int>( chr );
-   chr = wiringPiI2CReadReg8(fd, 0x01 );
+   chr = wiringPiI2CReadReg8(fd_ctrl, 0x01 );
    cout << " | " << hex << static_cast<int>(chr);
 
-   chr = wiringPiI2CReadReg8(fd, 0x02 );
+   chr = wiringPiI2CReadReg8(fd_ctrl, 0x02 );
    cout << " | " << hex << static_cast<int>(chr);
-   chr = wiringPiI2CReadReg8(fd, 0x03 );
+   chr = wiringPiI2CReadReg8(fd_ctrl, 0x03 );
    cout << " | " << hex << static_cast<int>(chr);
 
-   chr = wiringPiI2CReadReg8(fd, 0x04 );
+   chr = wiringPiI2CReadReg8(fd_ctrl, 0x04 );
    cout << " | " << hex << static_cast<int>(chr);
-   chr = wiringPiI2CReadReg8(fd, 0x05 );
+   chr = wiringPiI2CReadReg8(fd_ctrl, 0x05 );
    cout << " | " << hex << static_cast<int>(chr) << endl;
 
-   #define  isButtonC( r )  ( ! ( (r) & BUTTON_C ) )
-   #define  isButtonZ( r )  ( ! ( (r) & BUTTON_Z ) )
-
-   NUNCHUK ctrl = { 0 };
 
    while( true )
    {
-      // First read the last byte to check for exit condition Button-C
-      chr = wiringPiI2CReadReg8(fd, 0x05 );
+      // First read the last byte to check for Button-C
+      chr = wiringPiI2CReadReg8(fd_ctrl, 0x05 );
 
       if( isButtonC( chr ) && !ctrl.btn_c )
       {
@@ -190,6 +238,7 @@ int main()
          cout << "Button C released" << endl;
       }
 
+      // First read the last byte to check for Button-Z
       if( isButtonZ( chr ) && !ctrl.btn_z )
       {
          ctrl.btn_z = true;
@@ -201,38 +250,52 @@ int main()
          cout << "Button Z released" << endl;
       }
 
+      // First read the last byte to check for exit condition,
+      //   both buttons, Button-C and Button-Z
       if( isButtonC( chr ) && isButtonZ( chr ) )
       {
          cout << "Button C and Z pressed, exit signal." << endl;
          break;
       }
-//      result = wiringPiI2CWriteReg16(fd, 0x40, (i & 0xfff) );
+//      result = wiringPiI2CWriteReg16(fd_ctrl, 0x40, (i & 0xfff) );
 
-      // Need to set high order byte for Accelerometer
-      ctrl.accel.Z = ( chr & 0xC0 ) << 8;
-      ctrl.accel.Y = ( chr & 0x30 ) << 10;
-      ctrl.accel.X = ( chr & 0x0C ) << 12;
+      // Need to set low order 2-bits for Accelerometer
+      ctrl.accel.Z = ( chr & 0xC0 ) >> 6;
+      ctrl.accel.Y = ( chr & 0x30 ) >> 4;
+      ctrl.accel.X = ( chr & 0x0C ) >> 2;
 
-      // Need to set high order byte for Accelerometer
-      ctrl.accel.X += wiringPiI2CReadReg8(fd, 0x02 );
-      ctrl.accel.Y += wiringPiI2CReadReg8(fd, 0x03 );
-      ctrl.accel.Z += wiringPiI2CReadReg8(fd, 0x04 );
+      // Need to set high order 8-bits for Accelerometer
+      ctrl.accel.X |= (uint16_t)( wiringPiI2CReadReg8(fd_ctrl, 0x02 ) & 0xFF ) << 2;
+      ctrl.accel.Y |= (uint16_t)( wiringPiI2CReadReg8(fd_ctrl, 0x03 ) & 0xFF ) << 2;
+      ctrl.accel.Z |= (uint16_t)( wiringPiI2CReadReg8(fd_ctrl, 0x04 ) & 0xFF ) << 2;
 
       // Read Joystick X
-      ctrl.jstik.X = wiringPiI2CReadReg8(fd, 0x00 );
-      ctrl.jstik.Y = wiringPiI2CReadReg8(fd, 0x01 );
+      ctrl.jstik.X = wiringPiI2CReadReg8(fd_ctrl, 0x00 );
+      ctrl.jstik.Y = wiringPiI2CReadReg8(fd_ctrl, 0x01 );
 
-      cout << "REG ==> JX: " << showbase << hex << (int)ctrl.jstik.X;
-      cout << " | JY: " << hex << (int)ctrl.jstik.Y;
-      cout << " :: AX: " << hex << (int)ctrl.accel.X;
-      cout << " :: AY: " << hex << (int)ctrl.accel.Y;
-      cout << " :: AZ: " << hex << (int)ctrl.accel.Z << endl;
+      uint16_t jsMin  = 135;
+      uint16_t jsMax  = 820;
+      uint16_t jsStep = 1 + ( ( jsMax - jsMin ) / 4096 );
+      
+      uint16_t pwmX = ( ( ( jsMax - jsMin ) * ctrl.jstik.X / 256)  ) + ( jsMin / 2 );
+      uint16_t pwmY = ( ( ( jsMax - jsMin ) * ctrl.jstik.Y / 256 ) ) + ( jsMin / 2 );
+
+
+      pwm.set_pwm( 0, 0, pwmX );
+      pwm.set_pwm( 1, 0, pwmY-29 );
+      pwm.set_pwm( 2, 0, 404 );
+
+      cout << noshowbase << "REG ==> JX: 0x" << setw(4) << setfill('0') << (int)ctrl.jstik.X;
+      cout << dec << " (" << pwmX << ")";
+      cout << " | JY: 0x"  << setw(4) << setfill('0') << hex << (int)ctrl.jstik.Y;
+      cout << dec << " (" << pwmY << ")";
+      cout << " :: AX: " << setw(4) << setfill('0') << hex << (uint16_t)ctrl.accel.X;
+      cout << " :: AY: " << setw(4) << setfill('0') << hex << (uint16_t)ctrl.accel.Y;
+      cout << " :: AZ: " << setw(4) << setfill('0') << hex << (uint16_t)ctrl.accel.Z << endl;
+//      usleep( MILISECONDS * 100 );
       usleep( MILISECONDS * 100 );
 
-      if(result == -1)
-      {
-         cout << "Error.  Errno is: " << errno << endl;
-      }
    }
 
+   exit( result );
 }
