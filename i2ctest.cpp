@@ -145,7 +145,7 @@ int main()
 
     // Example: Set channel 0 to 0 degrees
     // 1ms pulse is (1/20) * 4096 = 204
-   pwm.set_pwm(0, 0, (uint16_t)204);
+    pwm.set_pwm(0, 0, (uint16_t)204);
     sleep(1);
 
    if( false  )
@@ -227,6 +227,7 @@ int main()
       // First read the last byte to check for Button-C
       chr = wiringPiI2CReadReg8(fd_ctrl, 0x05 );
 
+      // check for button-C pressed / released
       if( isButtonC( chr ) && !ctrl.btn_c )
       {
          ctrl.btn_c = true;
@@ -238,7 +239,7 @@ int main()
          cout << "Button C released" << endl;
       }
 
-      // First read the last byte to check for Button-Z
+      // Check for Button Z pressed / released
       if( isButtonZ( chr ) && !ctrl.btn_z )
       {
          ctrl.btn_z = true;
@@ -250,8 +251,8 @@ int main()
          cout << "Button Z released" << endl;
       }
 
-      // First read the last byte to check for exit condition,
-      //   both buttons, Button-C and Button-Z
+      // Check for both buttons, Button-C and Button-Z,
+      // pressed / released
       if( isButtonC( chr ) && isButtonZ( chr ) )
       {
          cout << "Button C and Z pressed, exit signal." << endl;
@@ -276,7 +277,7 @@ int main()
       uint16_t jsMin  = 135;
       uint16_t jsMax  = 820;
       uint16_t jsStep = 1 + ( ( jsMax - jsMin ) / 4096 );
-      
+
       uint16_t pwmX = ( ( ( jsMax - jsMin ) * ctrl.jstik.X / 256)  ) + ( jsMin / 2 );
       uint16_t pwmY = ( ( ( jsMax - jsMin ) * ctrl.jstik.Y / 256 ) ) + ( jsMin / 2 );
 
@@ -292,7 +293,6 @@ int main()
       cout << " :: AX: " << setw(4) << setfill('0') << hex << (uint16_t)ctrl.accel.X;
       cout << " :: AY: " << setw(4) << setfill('0') << hex << (uint16_t)ctrl.accel.Y;
       cout << " :: AZ: " << setw(4) << setfill('0') << hex << (uint16_t)ctrl.accel.Z << endl;
-//      usleep( MILISECONDS * 100 );
       usleep( MILISECONDS * 100 );
 
    }
