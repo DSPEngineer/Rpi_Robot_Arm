@@ -133,79 +133,38 @@ int main()
    result = wiringPiI2CWriteReg8(fd_ctrl, 0xF0, 0x55 );
    result = wiringPiI2CWriteReg8(fd_ctrl, 0xFB, 0x00 );
 
-
-#if 0
-   int fd_servo = wiringPiI2CSetup( PCA9685_I2C );
-   if ( -1 == fd_ctrl )
-   {
-      std::cout << "Failed to init I2C communication to PCA9684 Servo controller.\n";
-      return -1;
-   }
-
-   int val = wiringPiI2CReadReg8(fd_servo, 0 );
-   #define ON_VAL   0
-   #define OFF_VAL  200
-   int ret = wiringPiI2CReadReg8(fd_servo, 0);
-   ret = wiringPiI2CReadReg8(fd_servo, 1);
-   ret = wiringPiI2CWriteReg8(fd_servo, 0,  0x01 );
-
-
-       float prescaleval = 25000000; // 25MHz
-          prescaleval /= 4096; // 12-bit
-          prescaleval /= 60;
-          prescaleval -= 1;
-
-    int prescale = (int)(prescaleval + 0.5);
-//    wiringPiI2CWriteReg8(fd_servo, 0xFE,  prescale );
-
-   uint16_t on = 0;
-   uint16_t off = 0;
-
-   for( int i = 0; i < 400; i++ )
-   {
-      cout << "i = [" << dec << i << "]" << endl;
-      ret = wiringPiI2CWriteReg8(fd_servo, 7, ( on ) >> 8);
-      ret = wiringPiI2CWriteReg8(fd_servo, 6, ( on ) & 0xFF);
-      ret = wiringPiI2CWriteReg8(fd_servo, 9, ( 3*i + off ) >> 8);
-      ret = wiringPiI2CWriteReg8(fd_servo, 8, ( 3*i + off ) & 0xFF);
-      sleep( 1 );
-
-   }
-
-   ret = wiringPiI2CWriteReg8(fd_servo, 7, ON_VAL >> 8);
-   ret = wiringPiI2CWriteReg8(fd_servo, 6, ON_VAL & 0xFF);
-   ret = wiringPiI2CWriteReg8(fd_servo, 9, OFF_VAL >> 8);
-   ret = wiringPiI2CWriteReg8(fd_servo, 8, OFF_VAL & 0xFF);
-#endif
-
    cout << " INFO: Open I2C 0x" << hex << PCA9685_I2C << " address." << endl;
     // Using class
     PCA9685 pwm( PCA9685_I2C ); // PCA9685 I2C address is 0x40
-
+    
     // Example: Set channel 0 to 90 degrees (assuming 1ms-2ms pulse range for 0-180 degrees)
     // 1.5ms pulse is centered, which is (1.5/20) * 4096 = 307
-    pwm.set_pwm(0, 0, (uint16_t)307); 
+
+   // Vertical --  Up / Down
+   uint16_t jsY_Min  = 310;
+   uint16_t jsY_Max  = 705; // 720;
+   uint16_t jsY_Step = 1 + ( ( jsY_Max - jsY_Min ) / 4096 );
+   uint16_t pwmY_Mid = 426; // ( ( jsY_Max + jsY_Min ) / 2 );
+   // NOTES:     UP = 620 (720 max)
+   //         Horiz = 426
+   //          Base = 300
+   uint16_t pwmY = 426;
+    pwm.set_pwm(1, 100, pwmY );
     sleep(1);
 
-     // Example: Set channel 0 to 180 degrees
-    // 2ms pulse is (2/20) * 4096 = 409
-    pwm.set_pwm(0, 0, (uint16_t)670);
-    sleep(1);
 
-    // Example: Set channel 0 to 0 degrees
-    // 1ms pulse is (1/20) * 4096 = 204
-    pwm.set_pwm(0, 0, (uint16_t)204);
+   // Rotate - Left / Right
+   uint16_t jsX_Min  = 155;
+   uint16_t jsX_Max  = 655;
+   uint16_t jsX_Step = 1 + ( ( jsX_Max - jsX_Min ) / 4096 );
+   uint16_t pwmX_Mid = 409; // ( ( jsX_Max + jsX_Min ) / 2 );
+   // NOTES:   Left = 155
+   //        Middle = 409
+   //         Right = 655
+   // Setup Joystic ranges
+   uint16_t pwmX = 409;
+    pwm.set_pwm(0, 0, pwmX );
     sleep(1);
-
-   if( false  )
-   {
-      for( int i = 135; i < 730; i+=20 )
-      {
-         cout << "i = [" << dec << i << "]" << endl;
-         pwm.set_pwm(0, 0, i);
-         sleep(1);
-      }
-   }
 
  
    // Read Device ID as 16 bit words:
@@ -265,20 +224,21 @@ int main()
    chr = wiringPiI2CReadReg8(fd_ctrl, 0x05 );
    cout << " | " << hex << static_cast<int>(chr) << endl;
 
-   // Setup Joystic range
-   uint16_t jsMin  = 135;
-   uint16_t jsMax  = 820;
-   uint16_t jsStep = 1 + ( ( jsMax - jsMin ) / 4096 );
-
-   uint16_t pwmX_Mid = ( ( jsMax + jsMin ) / 2 );
-   uint16_t pwmX = ( ( ( jsMax - jsMin ) * ctrl.jstik.X / 256)  ) + ( jsMin / 2 );
-   uint16_t pwmY = ( ( ( jsMax - jsMin ) * ctrl.jstik.Y / 256 ) ) + ( jsMin / 2 );
-
-
-
    while( true )
    {
-      // First read the last byte to check for Button-C
+      // read the last byte (#5) to get buttons and acceleromoter bits
+      // bit 0 --> Button-Z
+      // bit 1 --> Button-C
+      // bit 3:2 --> Accel X bit 1:0
+      // bit 5:4 --> Accel Y bit 1:0
+      // bit 7:6 --> Accel Z bit 1:0
+      //        |-------------------------------|  
+      //        | Acc-Z Acc-Y Acc-X Btn-C Btn-Z |
+      //        |-------------------------------|  
+      //        | 1:0   1:0   1:0   R/P   R/P   |
+      //        |-------------------------------|  
+      //                           0=Pres 1=Release
+      //
       chr = wiringPiI2CReadReg8(fd_ctrl, 0x05 );
 
       // check for button-C pressed / released
@@ -312,7 +272,6 @@ int main()
          cout << "Button C and Z pressed, exit signal." << endl;
          break;
       }
-//      result = wiringPiI2CWriteReg16(fd_ctrl, 0x40, (i & 0xfff) );
 
       // Need to set low order 2-bits for Accelerometer
       ctrl.accel.Z = ( chr & 0xC0 ) >> 6;
@@ -328,15 +287,20 @@ int main()
       ctrl.jstik.X = wiringPiI2CReadReg8(fd_ctrl, 0x00 );
       ctrl.jstik.Y = wiringPiI2CReadReg8(fd_ctrl, 0x01 );
 
-      if( ctrl.jstik.X > 126 )
+      // Resolve data for Joystic X Direction
+      if( ctrl.jstik.X > 255 )
+      { // Ignore valuse that are out of range
+         cout << "ERROR: Joystick X value out of range (" << ctrl.jstik.X << ")" << endl;
+      }
+      else if( ctrl.jstik.X > 126 )
       {
-         if( pwmX < jsMax )
-            pwmX += 10;
+         if( pwmX <= jsX_Max )
+            pwmX += 1;
       }
       else if( ctrl.jstik.X < 126 )
       {
-         if( pwmX > jsMin )
-            pwmX -= 10;
+         if( pwmX >= jsX_Min )
+            pwmX -= 1;
       }
       else
       { // Joystick is neuteral
@@ -346,10 +310,40 @@ int main()
          //    pwmX += 1;
       }
 
+
+      // Resolve data for Joystic Y Direction
+      if( ctrl.jstik.Y > 255 )
+      { // Ignore valuse that are out of range
+         cout << "ERROR: Joystick Y value out of range (" << ctrl.jstik.Y << ")" << endl;
+      }
+      else if( ctrl.jstik.Y > 126 )
+      {
+         if( pwmY <= jsY_Max )
+         {
+            pwmY += 1;
+         }
+
+      }
+      else if( ctrl.jstik.Y < 126 )
+      {
+          if( pwmY >= jsY_Min )
+         {
+            pwmY -= 1;
+         }
+      }
+      else
+      { // Joystick is neuteral
+         // if( pwmY > pwmY_Mid )
+         //    pwmY -= 1;
+         // else if( pwmY < pwmY_Mid )
+         //    pwmY += 1;
+      }
+
+
       pwm.set_pwm( 0, 0, pwmX );
 
       pwm.set_pwm( 1, 0, pwmY-29 );
-      pwm.set_pwm( 2, 0, 404 );
+      pwm.set_pwm( 2, 0, 504 );
 
       cout << noshowbase << "REG ==> JX: 0x" << setw(4) << setfill('0') << (int)ctrl.jstik.X;
       cout << dec << " (" << pwmX << ")";
@@ -358,7 +352,7 @@ int main()
       cout << " :: AX: " << setw(4) << setfill('0') << hex << (uint16_t)ctrl.accel.X;
       cout << " :: AY: " << setw(4) << setfill('0') << hex << (uint16_t)ctrl.accel.Y;
       cout << " :: AZ: " << setw(4) << setfill('0') << hex << (uint16_t)ctrl.accel.Z << endl;
-      usleep( MILISECONDS * 100 );
+      usleep( MILISECONDS * 50 );
 
    }
 
