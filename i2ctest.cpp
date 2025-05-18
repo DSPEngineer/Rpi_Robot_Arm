@@ -65,7 +65,7 @@ Distributed as-is; no warranty is given.
 #include <unistd.h>
 #include <iomanip>
 
-#include "pca9685.h"
+//#include "pca9685.h"
 #include "pca9685.cpp"
 
 using namespace std;
@@ -107,7 +107,6 @@ typedef struct __Nunchuk
 #define  isButtonZ( r )  ( ! ( (r) & BUTTON_Z ) )
 
 
-
 int main()
 {
    int result = 0;
@@ -129,9 +128,59 @@ int main()
       return -1;
    }
 
-    cout << " INFO: Open I2C 0x" << hex << PCA9685_I2C << " address." << endl;
+  // disable encryption
+//   result = wiringPiI2CWriteReg16(fd_ctrl, 0x40, 0x0000 );
+   result = wiringPiI2CWriteReg8(fd_ctrl, 0xF0, 0x55 );
+   result = wiringPiI2CWriteReg8(fd_ctrl, 0xFB, 0x00 );
+
+
+#if 0
+   int fd_servo = wiringPiI2CSetup( PCA9685_I2C );
+   if ( -1 == fd_ctrl )
+   {
+      std::cout << "Failed to init I2C communication to PCA9684 Servo controller.\n";
+      return -1;
+   }
+
+   int val = wiringPiI2CReadReg8(fd_servo, 0 );
+   #define ON_VAL   0
+   #define OFF_VAL  200
+   int ret = wiringPiI2CReadReg8(fd_servo, 0);
+   ret = wiringPiI2CReadReg8(fd_servo, 1);
+   ret = wiringPiI2CWriteReg8(fd_servo, 0,  0x01 );
+
+
+       float prescaleval = 25000000; // 25MHz
+          prescaleval /= 4096; // 12-bit
+          prescaleval /= 60;
+          prescaleval -= 1;
+
+    int prescale = (int)(prescaleval + 0.5);
+//    wiringPiI2CWriteReg8(fd_servo, 0xFE,  prescale );
+
+   uint16_t on = 0;
+   uint16_t off = 0;
+
+   for( int i = 0; i < 400; i++ )
+   {
+      cout << "i = [" << dec << i << "]" << endl;
+      ret = wiringPiI2CWriteReg8(fd_servo, 7, ( on ) >> 8);
+      ret = wiringPiI2CWriteReg8(fd_servo, 6, ( on ) & 0xFF);
+      ret = wiringPiI2CWriteReg8(fd_servo, 9, ( 3*i + off ) >> 8);
+      ret = wiringPiI2CWriteReg8(fd_servo, 8, ( 3*i + off ) & 0xFF);
+      sleep( 1 );
+
+   }
+
+   ret = wiringPiI2CWriteReg8(fd_servo, 7, ON_VAL >> 8);
+   ret = wiringPiI2CWriteReg8(fd_servo, 6, ON_VAL & 0xFF);
+   ret = wiringPiI2CWriteReg8(fd_servo, 9, OFF_VAL >> 8);
+   ret = wiringPiI2CWriteReg8(fd_servo, 8, OFF_VAL & 0xFF);
+#endif
+
+   cout << " INFO: Open I2C 0x" << hex << PCA9685_I2C << " address." << endl;
     // Using class
-    PCA9685 pwm(0x40); // PCA9685 I2C address is 0x40
+    PCA9685 pwm( PCA9685_I2C ); // PCA9685 I2C address is 0x40
 
     // Example: Set channel 0 to 90 degrees (assuming 1ms-2ms pulse range for 0-180 degrees)
     // 1.5ms pulse is centered, which is (1.5/20) * 4096 = 307
@@ -148,7 +197,7 @@ int main()
     pwm.set_pwm(0, 0, (uint16_t)204);
     sleep(1);
 
-   if( false  )
+   if( true  )
    {
       for( int i = 135; i < 730; i+=20 )
       {
@@ -158,12 +207,7 @@ int main()
       }
    }
 
-   // disable encryption
-//   result = wiringPiI2CWriteReg16(fd_ctrl, 0x40, 0x0000 );
-   result = wiringPiI2CWriteReg8(fd_ctrl, 0xF0, 0x55 );
-   result = wiringPiI2CWriteReg8(fd_ctrl, 0xFB, 0x00 );
-
-
+ 
    // Read Device ID as 16 bit words:
    int cword = wiringPiI2CReadReg16( fd_ctrl, 0xFA );
    cout << "REG: " << hex << ( cword ) << endl;
@@ -281,7 +325,7 @@ int main()
       uint16_t pwmX = ( ( ( jsMax - jsMin ) * ctrl.jstik.X / 256)  ) + ( jsMin / 2 );
       uint16_t pwmY = ( ( ( jsMax - jsMin ) * ctrl.jstik.Y / 256 ) ) + ( jsMin / 2 );
 
-
+      if( )
       pwm.set_pwm( 0, 0, pwmX );
       pwm.set_pwm( 1, 0, pwmY-29 );
       pwm.set_pwm( 2, 0, 404 );

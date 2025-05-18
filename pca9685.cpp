@@ -1,14 +1,33 @@
 #include "pca9685.h"
 
+#define RESET_BIT 0x80
+#define SLEEP_BIT 0x10
 
 PCA9685::PCA9685(uint8_t address) : address_(address)
 {
-    file_descriptor_ = wiringPiI2CSetup(address_);
+    // Initialize the interface by giving it an external device ID.
+     file_descriptor_ = wiringPiI2CSetup( address_ );
 
     if (file_descriptor_ == -1)
     {
         std::cout << "Failed to init I2C communication to Motor Controller PCA9685 Joystick.\n";
     }
+
+    int curMode = read_reg(0x00);
+
+    write_reg( 0,  0x01 );
+    curMode = read_reg(0x00);
+
+    if( ! (curMode & RESET_BIT ) )
+    {
+        std::cout << "PCA9685 is not in reset mode.\n";
+    }
+
+    if( ! (curMode & SLEEP_BIT ) )
+    {
+        std::cout << "PCA9685 is not in sleep mode.\n";
+    }
+
     set_pwm_freq(60); // Set frequency to 60Hz
 }
 
@@ -35,12 +54,10 @@ PCA9685::set_pwm(uint8_t channel, uint16_t on, uint16_t off)
         write_reg(channel_offset, on & 0xFF);
         usleep( I2Cdelay );
     }
-
+    
     if( off != curPwmOff[channel] )
     {
         curPwmOff[channel] = off;
-//        write_reg(channel_offset + 2, off & 0xFF);
-//        write_reg(channel_offset + 3, off >> 8);
         write_reg(channel_offset + 3, ( off >> 8 ) & 0x0F );
         usleep( I2Cdelay );
         write_reg(channel_offset + 2, off & 0xFF);
@@ -53,9 +70,9 @@ void
 PCA9685::set_pwm_freq(uint16_t freq_hz)
 {
     float prescaleval = 25000000; // 25MHz
-    prescaleval /= 4096; // 12-bit
-    prescaleval /= freq_hz;
-    prescaleval -= 1;
+          prescaleval /= 4096; // 12-bit
+          prescaleval /= freq_hz;
+          prescaleval -= 1;
 
     int prescale = (int)(prescaleval + 0.5);
 
@@ -79,7 +96,7 @@ PCA9685::write_reg(int reg, int value)
     } while( 0 != ret );
 }
 
-int
+int8_t
 PCA9685::read_reg(int reg)
 {
     return wiringPiI2CReadReg8(file_descriptor_, reg);
