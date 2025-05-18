@@ -197,7 +197,7 @@ int main()
     pwm.set_pwm(0, 0, (uint16_t)204);
     sleep(1);
 
-   if( true  )
+   if( false  )
    {
       for( int i = 135; i < 730; i+=20 )
       {
@@ -265,6 +265,16 @@ int main()
    chr = wiringPiI2CReadReg8(fd_ctrl, 0x05 );
    cout << " | " << hex << static_cast<int>(chr) << endl;
 
+   // Setup Joystic range
+   uint16_t jsMin  = 135;
+   uint16_t jsMax  = 820;
+   uint16_t jsStep = 1 + ( ( jsMax - jsMin ) / 4096 );
+
+   uint16_t pwmX_Mid = ( ( jsMax + jsMin ) / 2 );
+   uint16_t pwmX = ( ( ( jsMax - jsMin ) * ctrl.jstik.X / 256)  ) + ( jsMin / 2 );
+   uint16_t pwmY = ( ( ( jsMax - jsMin ) * ctrl.jstik.Y / 256 ) ) + ( jsMin / 2 );
+
+
 
    while( true )
    {
@@ -318,15 +328,26 @@ int main()
       ctrl.jstik.X = wiringPiI2CReadReg8(fd_ctrl, 0x00 );
       ctrl.jstik.Y = wiringPiI2CReadReg8(fd_ctrl, 0x01 );
 
-      uint16_t jsMin  = 135;
-      uint16_t jsMax  = 820;
-      uint16_t jsStep = 1 + ( ( jsMax - jsMin ) / 4096 );
+      if( ctrl.jstik.X > 126 )
+      {
+         if( pwmX < jsMax )
+            pwmX += 10;
+      }
+      else if( ctrl.jstik.X < 126 )
+      {
+         if( pwmX > jsMin )
+            pwmX -= 10;
+      }
+      else
+      { // Joystick is neuteral
+         // if( pwmX > pwmX_Mid )
+         //    pwmX -= 1;
+         // else if( pwmX < pwmX_Mid )
+         //    pwmX += 1;
+      }
 
-      uint16_t pwmX = ( ( ( jsMax - jsMin ) * ctrl.jstik.X / 256)  ) + ( jsMin / 2 );
-      uint16_t pwmY = ( ( ( jsMax - jsMin ) * ctrl.jstik.Y / 256 ) ) + ( jsMin / 2 );
-
-      if( )
       pwm.set_pwm( 0, 0, pwmX );
+
       pwm.set_pwm( 1, 0, pwmY-29 );
       pwm.set_pwm( 2, 0, 404 );
 
