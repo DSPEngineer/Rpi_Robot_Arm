@@ -24,7 +24,8 @@ private:
 
     int address_;
     int file_descriptor_;
+    int deviceInitialMode;
 
-    void    write_reg(int reg, int value);
+    int8_t  write_reg(int reg, int value);
     int8_t  read_reg(int reg);
 };

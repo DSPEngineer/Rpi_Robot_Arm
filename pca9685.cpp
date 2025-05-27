@@ -13,11 +13,15 @@ PCA9685::PCA9685(uint8_t address) : address_(address)
         std::cout << "Failed to init I2C communication to Motor Controller PCA9685 Joystick.\n";
     }
 
-    int curMode = read_reg(0x00);
+    int deviceInitialMode = read_reg(0x00);
 
-    write_reg( 0,  0x01 );
+    // Set the device mode to awake and out of reset
+    if( 0 != write_reg( 0x00,  0x01 ) )
+    {
+        std::cout << "PCA9685 Failed to set PCA9685 to awake mode.\n";
+    }
+
     curMode = read_reg(0x00);
-
     if( ! (curMode & RESET_BIT ) )
     {
         std::cout << "PCA9685 is not in reset mode.\n";
@@ -31,13 +35,15 @@ PCA9685::PCA9685(uint8_t address) : address_(address)
     set_pwm_freq(60); // Set frequency to 60Hz
 }
 
-void
+
+void  // No retusn since we are saving variables to class
 PCA9685::set_pwm_map( uint16_t min, uint16_t max)
 {
-    // 140 to 720 with range = 4096
+    // Set ranges inside of this class
     PWM_MIN = min;
     PWM_MAX = max;
 }
+
 
 #define I2Cdelay   75
 void
@@ -86,7 +92,7 @@ PCA9685::set_pwm_freq(uint16_t freq_hz)
 }
 
 
-void
+int8_t
 PCA9685::write_reg(int reg, int value)
 {
     int ret = -1;
@@ -94,6 +100,8 @@ PCA9685::write_reg(int reg, int value)
     {
         ret = wiringPiI2CWriteReg8(file_descriptor_, reg, value);
     } while( 0 != ret );
+
+    return ret;
 }
 
 int8_t

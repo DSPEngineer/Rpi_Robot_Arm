@@ -80,6 +80,16 @@ using namespace std;
 #define BUTTON_Z     0x01
 #define BUTTON_C     0x02
 
+#define JOYSTICK_X_NEUTRAL    126
+#define JOYSTICK_Y_NEUTRAL    126
+
+#define JOYSTICK_X_INCREMENT  3
+#define JOYSTICK_Y_INCREMENT  3
+
+#define JOYSTICK_X_MAX        255
+#define JOYSTICK_Y_MAX        255
+
+
 typedef struct __Accelerometer
 { // Struct to save Accelerometer Data
     uint16_t X;
@@ -113,8 +123,6 @@ int main()
 
    NUNCHUK ctrl = { 0 };
 
-//   wiringPiSetup();
-
    // Initialize the interface by giving it an external device ID.
    // The Wii Nunchuk Joustick defaults to address 0x52.   
    //
@@ -128,10 +136,17 @@ int main()
       return -1;
    }
 
-  // disable encryption
-//   result = wiringPiI2CWriteReg16(fd_ctrl, 0x40, 0x0000 );
-   result = wiringPiI2CWriteReg8(fd_ctrl, 0xF0, 0x55 );
-   result = wiringPiI2CWriteReg8(fd_ctrl, 0xFB, 0x00 );
+   // disable NunChuck (joystick) encryption
+   if( result = wiringPiI2CWriteReg8(fd_ctrl, 0xF0, 0x55 ) )
+   {
+      cout << "ERROR: Failed to disable encryption, result: " << result << endl;
+      return -1;
+   }
+   if( result = wiringPiI2CWriteReg8(fd_ctrl, 0xFB, 0x00 ) )
+   {
+      cout << "ERROR: Failed to disable encryption, result: " << result << endl;
+      return -1;
+   }
 
    cout << " INFO: Open I2C 0x" << hex << PCA9685_I2C << " address." << endl;
     // Using class
@@ -224,6 +239,7 @@ int main()
    chr = wiringPiI2CReadReg8(fd_ctrl, 0x05 );
    cout << " | " << hex << static_cast<int>(chr) << endl;
 
+
    while( true )
    {
       // read the last byte (#5) to get buttons and acceleromoter bits
@@ -283,24 +299,24 @@ int main()
       ctrl.accel.Y |= (uint16_t)( wiringPiI2CReadReg8(fd_ctrl, 0x03 ) & 0xFF ) << 2;
       ctrl.accel.Z |= (uint16_t)( wiringPiI2CReadReg8(fd_ctrl, 0x04 ) & 0xFF ) << 2;
 
-      // Read Joystick X
+      // Read Joystick X & Y values
       ctrl.jstik.X = wiringPiI2CReadReg8(fd_ctrl, 0x00 );
       ctrl.jstik.Y = wiringPiI2CReadReg8(fd_ctrl, 0x01 );
 
       // Resolve data for Joystic X Direction
-      if( ctrl.jstik.X > 255 )
+      if( ctrl.jstik.X > JOYSTICK_X_MAX )
       { // Ignore valuse that are out of range
          cout << "ERROR: Joystick X value out of range (" << ctrl.jstik.X << ")" << endl;
       }
-      else if( ctrl.jstik.X > 126 )
+      else if( ctrl.jstik.X > JOYSTICK_X_NEUTRAL )
       {
          if( pwmX <= jsX_Max )
-            pwmX += 1;
+            pwmX += JOYSTICK_X_INCREMENT;
       }
-      else if( ctrl.jstik.X < 126 )
+      else if( ctrl.jstik.X < JOYSTICK_X_NEUTRAL )
       {
          if( pwmX >= jsX_Min )
-            pwmX -= 1;
+            pwmX -= JOYSTICK_X_INCREMENT;
       }
       else
       { // Joystick is neuteral
@@ -312,23 +328,23 @@ int main()
 
 
       // Resolve data for Joystic Y Direction
-      if( ctrl.jstik.Y > 255 )
+      if( ctrl.jstik.Y > JOYSTICK_Y_MAX )
       { // Ignore valuse that are out of range
          cout << "ERROR: Joystick Y value out of range (" << ctrl.jstik.Y << ")" << endl;
       }
-      else if( ctrl.jstik.Y > 126 )
+      else if( ctrl.jstik.Y > JOYSTICK_Y_NEUTRAL )
       {
          if( pwmY <= jsY_Max )
          {
-            pwmY += 1;
+            pwmY += JOYSTICK_Y_INCREMENT;
          }
 
       }
-      else if( ctrl.jstik.Y < 126 )
+      else if( ctrl.jstik.Y < JOYSTICK_Y_NEUTRAL )
       {
           if( pwmY >= jsY_Min )
          {
-            pwmY -= 1;
+            pwmY -= JOYSTICK_Y_INCREMENT;
          }
       }
       else
