@@ -8,9 +8,9 @@ class PCA9685 {
 public:
     PCA9685(uint8_t address);
 
-    void set_pwm(uint8_t channel, uint16_t on, uint16_t off);
-    void set_pwm_freq(uint16_t freq_hz);
-    void set_pwm_map( uint16_t min, uint16_t max);
+    int     set_pwm(uint8_t channel, uint16_t on, uint16_t off);
+    int     set_pwm_freq(uint16_t freq_hz);
+    int     set_pwm_map( uint16_t min, uint16_t max);
 
 private:
     const uint16_t      PWM_BITS=12;
@@ -24,7 +24,8 @@ private:
 
     int address_;
     int file_descriptor_;
+    int deviceInitialMode;
 
-    void write_reg(int reg, int value);
-    int read_reg(int reg);
+    int8_t  write_reg(int reg, int value);
+    int8_t  read_reg(int reg);
 };
